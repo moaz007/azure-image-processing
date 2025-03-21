@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Microsoft.ApplicationInsights.Event",
+    "time": "2025-03-20T01:59:51Z",
+    "iKey": "a8d826c0-fc8e-4ab3-ac78-125f0117a140",
+    "data": {
+      "baseType": "EventData",
+      "baseData": {
+        "name": "UnifiedWorkflowMetrics",
+        "properties": {
+          "uploadExec": "705",
+          "processExec": "157",
+          "coldStart": "true",
+          "totalWorkflowTime": "7498ms"
+        }
+      }
+    }
+  }
+]

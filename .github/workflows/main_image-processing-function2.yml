@@ -1,0 +1,85 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # Required for azure/login@v2
+      contents: read
+
+    steps:
+      # Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # Authenticate with Azure using GitHub secrets
+      - name: Authenticate with Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Log deployment start time
+      - name: Log Deploy Start Time
+        id: deploy_start
+        run: echo "::set-output name=start::$(date +%s)"
+
+      # Deploy the Azure Functions application
+      - name: Deploy to Azure Functions
+        uses: azure/functions-action@v1
+        with:
+          app-name: 'image-processing-function2'
+          package: '.'
+
+      # Log deployment end time
+      - name: Log Deploy End Time
+        id: deploy_end
+        run: echo "::set-output name=end::$(date +%s)"
+
+      # Calculate and export deploy duration
+      - name: Calculate Deploy Duration
+        id: calc_duration
+        run: |
+          DEPLOY_DURATION=$(( ${{ steps.deploy_end.outputs.end }} - ${{ steps.deploy_start.outputs.start }} ))
+          echo "Deploy Duration: ${DEPLOY_DURATION} seconds"
+          echo "DEPLOY_DURATION=${DEPLOY_DURATION}" >> $GITHUB_ENV
+
+      # Publish the deployment duration to Application Insights
+      - name: Publish Deploy Duration
+        if: always()
+        run: |
+          echo "Publishing Deploy Duration: ${DEPLOY_DURATION} seconds"
+          CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat <<EOF > deploy_duration.json
+          [
+            {
+              "name": "Microsoft.ApplicationInsights.Event",
+              "time": "$CURRENT_TIME",
+              "iKey": "a8d826c0-fc8e-4ab3-ac78-125f0117a140",
+              "data": {
+                "baseType": "EventData",
+                "baseData": {
+                  "name": "DeployDuration",
+                  "properties": {
+                    "durationSec": "$DEPLOY_DURATION"
+                  }
+                }
+              }
+            }
+          ]
+          EOF
+          RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d @deploy_duration.json "https://dc.services.visualstudio.com/v2/track")
+          echo "Publish Response: $RESPONSE"
+

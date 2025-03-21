@@ -1,0 +1,11 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=imageprocessingstorage2;AccountKey=gCZS06v0SXmOUybQphIJMGqdf635oOXX/RFoPZ4hnVZ1YkwS9P5Z6dd5MrSFxFpOqKpA+i7fyYTe+AStWUHg2w==;BlobEndpoint=https://imageprocessingstorage2.blob.core.windows.net/;FileEndpoint=https://imageprocessingstorage2.file.core.windows.net/;QueueEndpoint=https://imageprocessingstorage2.queue.core.windows.net/;TableEndpoint=https://imageprocessingstorage2.table.core.windows.net/",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+    "UPLOAD_CONTAINER": "upload",
+    "PROCESS_CONTAINER": "process"
+  }
+}
+
