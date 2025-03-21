@@ -1,4 +1,4 @@
-#Serverless Image Processing API
+# Serverless Image Processing API
 
 This project is a serverless image processing API built with Node.js (v20.19.0) using Azure Functions and Azure Blob Storage. It leverages Azure Functions for running HTTP‑triggered functions, along with GitHub Actions for automated continuous integration and deployment.
 
