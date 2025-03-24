@@ -3,18 +3,25 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 module.exports = async function (context, req) {
   // Throttle simulation: check if a throttle should be simulated
   if (req.query.simulateThrottle || (req.body && req.body.simulateThrottle)) {
-    // Initialize Application Insights if not already done
+  try {
     const appInsights = require('applicationinsights');
+    const instrKey = process.env.APPINSIGHTS_INSTRUMENTATIONKEY;
+    if (!instrKey) {
+      context.log.warn("APPINSIGHTS_INSTRUMENTATIONKEY is not set.");
+    }
     if (!appInsights.defaultClient) {
-      appInsights.setup(process.env.APPINSIGHTS_INSTRUMENTATIONKEY).start();
+      appInsights.setup(instrKey || "").start();
     }
     appInsights.defaultClient.trackEvent({ 
       name: "ThrottleEvent", 
       properties: { functionName: "uploadImage" } 
     });
-    context.res = { status: 429, body: "Throttled due to simulation." };
-    return;
+  } catch (telemetryError) {
+    context.log.error("Error logging throttle event:", telemetryError.message);
   }
+  context.res = { status: 429, body: "Throttled due to simulation." };
+  return;
+}
 
   const startTime = Date.now();
   const { image, fileName } = req.body;
