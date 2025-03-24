@@ -1,17 +1,17 @@
 [
   {
     "name": "Microsoft.ApplicationInsights.Event",
-    "time": "2025-03-22T05:13:11Z",
+    "time": "2025-03-24T04:42:04Z",
     "iKey": "a8d826c0-fc8e-4ab3-ac78-125f0117a140",
     "data": {
       "baseType": "EventData",
       "baseData": {
         "name": "UnifiedWorkflowMetrics",
         "properties": {
-          "uploadExec": "64",
-          "processExec": "163",
+          "uploadExec": "12",
+          "processExec": "36",
           "coldStart": "false",
-          "totalWorkflowTime": "4393ms"
+          "totalWorkflowTime": "10412ms"
         }
       }
     }

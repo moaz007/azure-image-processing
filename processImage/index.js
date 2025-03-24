@@ -1,9 +1,27 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 const sharp = require('sharp');
+const appInsights = require("applicationinsights");
+
+// Initialize Application Insights if not already started.
+if (!appInsights.defaultClient) {
+  appInsights.start();
+}
+const telemetryClient = appInsights.defaultClient;
 
 let isColdStart = true;
 
 module.exports = async function (context, req) {
+  // --- Track the start of the function ---
+  telemetryClient.trackEvent({
+    name: "FunctionStarted",
+    properties: {
+      functionName: "processimage",
+      invocationId: context.invocationId,
+      coldStart: isColdStart,
+      startTime: new Date().toISOString()
+    }
+  });
+
   const overallStart = Date.now();
   const { containerName, fileName } = req.body;
   if (!containerName || !fileName) {
@@ -21,7 +39,7 @@ module.exports = async function (context, req) {
     }
     context.log("Using storage connection string");
 
-    // Download the image from the specified container
+    // --- Download the image from the specified container ---
     const downloadStart = Date.now();
     const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
     const containerClient = blobServiceClient.getContainerClient(containerName);
@@ -36,7 +54,7 @@ module.exports = async function (context, req) {
     const downloadTime = Date.now() - downloadStart;
     context.log(`Blob downloaded in ${downloadTime} ms`);
 
-    // Process the image: resize and convert to JPEG
+    // --- Process the image: resize and convert to JPEG ---
     const processStart = Date.now();
     context.log("Processing image with Sharp...");
     const processedBuffer = await sharp(imageBuffer)
@@ -46,7 +64,7 @@ module.exports = async function (context, req) {
     const processingTime = Date.now() - processStart;
     context.log(`Image processed in ${processingTime} ms`);
 
-    // Upload the processed image to the 'process' container
+    // --- Upload the processed image to the 'process' container ---
     const uploadStart = Date.now();
     const processedFileName = `processed-${fileName}`;
     context.log(`Processed file name: ${processedFileName}`);
@@ -59,7 +77,7 @@ module.exports = async function (context, req) {
     const uploadTime = Date.now() - uploadStart;
     context.log(`Processed image uploaded in ${uploadTime} ms`);
 
-    // Optionally, upload a status file (for tracking) in JSON format
+    // --- Optionally, upload a status file (for tracking) in JSON format ---
     const statusStart = Date.now();
     const statusContent = {
       message: "Image processed successfully!",
@@ -83,6 +101,20 @@ module.exports = async function (context, req) {
     context.log(`Memory usage: ${memoryUsedMB} MB`);
 
     isColdStart = false;
+    
+    // --- Track the end of the function (success) ---
+    telemetryClient.trackEvent({
+      name: "FunctionEnded",
+      properties: {
+        functionName: "processimage",
+        invocationId: context.invocationId,
+        endTime: new Date().toISOString(),
+        executionTime: overallExecTime,
+        coldStart: coldStart,
+        status: "Success"
+      }
+    });
+
     context.res = {
       status: 200,
       body: { 
@@ -95,6 +127,21 @@ module.exports = async function (context, req) {
   } catch (error) {
     context.log.error("Process Error:", error.message);
     const overallExecTime = Date.now() - overallStart;
+    
+    // --- Track the end of the function (error) ---
+    telemetryClient.trackEvent({
+      name: "FunctionEnded",
+      properties: {
+        functionName: "processimage",
+        invocationId: context.invocationId,
+        endTime: new Date().toISOString(),
+        executionTime: overallExecTime,
+        coldStart: coldStart,
+        status: "Error",
+        errorMessage: error.message
+      }
+    });
+    
     context.res = { 
       status: 500, 
       body: { error: error.message, coldStart: coldStart, executionTime: overallExecTime } 
