@@ -1,10 +1,14 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 const sharp = require('sharp');
+const appInsights = require("applicationinsights"); if (!appInsights.defaultClient) appInsights.start(); const telemetryClient = appInsights.defaultClient;
 
 let isColdStart = true;
 
 module.exports = async function (context, req) {
   const overallStart = Date.now();
+  // Added telemetry: mark function start
+  telemetryClient.trackEvent({ name: "FunctionStarted", properties: { functionName: "process", invocationId: context.invocationId, coldStart: isColdStart } });
+  
   const { containerName, fileName } = req.body;
   if (!containerName || !fileName) {
     context.log.error("Missing 'containerName' or 'fileName'");
@@ -22,7 +26,6 @@ module.exports = async function (context, req) {
     context.log("Using storage connection string");
 
     // Download the image from the specified container
-    const downloadStart = Date.now();
     const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
     const containerClient = blobServiceClient.getContainerClient(containerName);
     const blobClient = containerClient.getBlockBlobClient(fileName);
@@ -33,7 +36,7 @@ module.exports = async function (context, req) {
       chunks.push(chunk);
     }
     const imageBuffer = Buffer.concat(chunks);
-    const downloadTime = Date.now() - downloadStart;
+    const downloadTime = Date.now() - overallStart;
     context.log(`Blob downloaded in ${downloadTime} ms`);
 
     // Process the image: resize and convert to JPEG
@@ -92,9 +95,13 @@ module.exports = async function (context, req) {
         executionTime: overallExecTime 
       }
     };
+    // Added telemetry: mark function end (success)
+    telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "process", invocationId: context.invocationId, executionTime: overallExecTime, coldStart: coldStart, status: "Success" } });
   } catch (error) {
     context.log.error("Process Error:", error.message);
     const overallExecTime = Date.now() - overallStart;
+    // Added telemetry: mark function end (error)
+    telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "process", invocationId: context.invocationId, executionTime: overallExecTime, coldStart: coldStart, status: "Error", errorMessage: error.message } });
     context.res = { 
       status: 500, 
       body: { error: error.message, coldStart: coldStart, executionTime: overallExecTime } 
