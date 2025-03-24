@@ -1,5 +1,12 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 const sharp = require('sharp');
+const appInsights = require("applicationinsights");
+
+// Initialize Application Insights (ensure your APPINSIGHTS_INSTRUMENTATIONKEY is set in your environment)
+if (!appInsights.defaultClient) {
+  appInsights.setup(process.env.APPINSIGHTS_INSTRUMENTATIONKEY).start();
+}
+const telemetryClient = appInsights.defaultClient;
 
 let isColdStart = true;
 
@@ -94,6 +101,15 @@ module.exports = async function (context, req) {
     };
   } catch (error) {
     context.log.error("Process Error:", error.message);
+
+    // Detect throttle error (HTTP 429) and log a custom telemetry event
+    if (error.statusCode === 429 || (error.message && error.message.includes("429"))) {
+      telemetryClient.trackEvent({
+        name: "ThrottleEvent",
+        properties: { FunctionName: "process", ThrottleCount: 1 }
+      });
+    }
+
     const overallExecTime = Date.now() - overallStart;
     context.res = { 
       status: 500, 
