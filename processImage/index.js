@@ -5,7 +5,7 @@ let isColdStart = true;
 
 module.exports = async function (context, req) {
   // Throttle simulation: check if a throttle should be simulated
- if (req.query.simulateThrottle || (req.body && req.body.simulateThrottle)) {
+if (req.query.simulateThrottle || (req.body && req.body.simulateThrottle)) {
   try {
     const appInsights = require('applicationinsights');
     const instrKey = process.env.APPINSIGHTS_INSTRUMENTATIONKEY;
@@ -17,14 +17,22 @@ module.exports = async function (context, req) {
     }
     appInsights.defaultClient.trackEvent({ 
       name: "ThrottleEvent", 
-      properties: { functionName: "processImage" } 
+      properties: { functionName: "uploadImage" } 
     });
+    // Flush telemetry to ensure it is sent before function exit.
+    appInsights.defaultClient.flush({
+      callback: () => {
+        context.log("Telemetry flushed for throttle event.");
+        context.res = { status: 429, body: "Throttled due to simulation." };
+        context.done();  // Ensure function waits for flush.
+      }
+    });
+    return; // Exit the function after scheduling the flush.
   } catch (telemetryError) {
     context.log.error("Error logging throttle event:", telemetryError.message);
   }
-  context.res = { status: 429, body: "Throttled due to simulation." };
-  return;
 }
+
   
   const overallStart = Date.now();
   const { containerName, fileName } = req.body;
