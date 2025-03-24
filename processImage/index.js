@@ -4,12 +4,6 @@ const sharp = require('sharp');
 let isColdStart = true;
 
 module.exports = async function (context, req) {
-  // Telemetry: Mark function start
-  const appInsights = require("applicationinsights");
-  if (!appInsights.defaultClient) { appInsights.start(); }
-  const telemetryClient = appInsights.defaultClient;
-  telemetryClient.trackEvent({ name: "FunctionStarted", properties: { functionName: "process", invocationId: context.invocationId, coldStart: isColdStart } });
-
   const overallStart = Date.now();
   const { containerName, fileName } = req.body;
   if (!containerName || !fileName) {
@@ -28,6 +22,7 @@ module.exports = async function (context, req) {
     context.log("Using storage connection string");
 
     // Download the image from the specified container
+    const downloadStart = Date.now();
     const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
     const containerClient = blobServiceClient.getContainerClient(containerName);
     const blobClient = containerClient.getBlockBlobClient(fileName);
@@ -38,7 +33,7 @@ module.exports = async function (context, req) {
       chunks.push(chunk);
     }
     const imageBuffer = Buffer.concat(chunks);
-    const downloadTime = Date.now() - overallStart;
+    const downloadTime = Date.now() - downloadStart;
     context.log(`Blob downloaded in ${downloadTime} ms`);
 
     // Process the image: resize and convert to JPEG
@@ -97,13 +92,9 @@ module.exports = async function (context, req) {
         executionTime: overallExecTime 
       }
     };
-    // Telemetry: Mark function end (success)
-    telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "process", invocationId: context.invocationId, executionTime: overallExecTime, coldStart: coldStart, status: "Success" } });
   } catch (error) {
     context.log.error("Process Error:", error.message);
     const overallExecTime = Date.now() - overallStart;
-    // Telemetry: Mark function end (error)
-    telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "process", invocationId: context.invocationId, executionTime: overallExecTime, coldStart: coldStart, status: "Error", errorMessage: error.message } });
     context.res = { 
       status: 500, 
       body: { error: error.message, coldStart: coldStart, executionTime: overallExecTime } 
