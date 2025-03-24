@@ -4,6 +4,20 @@ const sharp = require('sharp');
 let isColdStart = true;
 
 module.exports = async function (context, req) {
+  // Throttle simulation: check if a throttle should be simulated
+  if (req.query.simulateThrottle || (req.body && req.body.simulateThrottle)) {
+    const appInsights = require('applicationinsights');
+    if (!appInsights.defaultClient) {
+      appInsights.setup(process.env.APPINSIGHTS_INSTRUMENTATIONKEY).start();
+    }
+    appInsights.defaultClient.trackEvent({ 
+      name: "ThrottleEvent", 
+      properties: { functionName: "processImage" } 
+    });
+    context.res = { status: 429, body: "Throttled due to simulation." };
+    return;
+  }
+  
   const overallStart = Date.now();
   const { containerName, fileName } = req.body;
   if (!containerName || !fileName) {
