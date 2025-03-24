@@ -1,12 +1,5 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 const sharp = require('sharp');
-const appInsights = require("applicationinsights");
-
-// Initialize Application Insights (ensure your APPINSIGHTS_INSTRUMENTATIONKEY is set in your environment)
-if (!appInsights.defaultClient) {
-  appInsights.setup(process.env.APPINSIGHTS_INSTRUMENTATIONKEY).start();
-}
-const telemetryClient = appInsights.defaultClient;
 
 let isColdStart = true;
 
@@ -28,8 +21,6 @@ module.exports = async function (context, req) {
     }
     context.log("Using storage connection string");
 
-    // Download the image from the specified container
-    const downloadStart = Date.now();
     const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
     const containerClient = blobServiceClient.getContainerClient(containerName);
     const blobClient = containerClient.getBlockBlobClient(fileName);
@@ -40,10 +31,9 @@ module.exports = async function (context, req) {
       chunks.push(chunk);
     }
     const imageBuffer = Buffer.concat(chunks);
-    const downloadTime = Date.now() - downloadStart;
+    const downloadTime = Date.now() - overallStart;
     context.log(`Blob downloaded in ${downloadTime} ms`);
 
-    // Process the image: resize and convert to JPEG
     const processStart = Date.now();
     context.log("Processing image with Sharp...");
     const processedBuffer = await sharp(imageBuffer)
@@ -53,7 +43,6 @@ module.exports = async function (context, req) {
     const processingTime = Date.now() - processStart;
     context.log(`Image processed in ${processingTime} ms`);
 
-    // Upload the processed image to the 'process' container
     const uploadStart = Date.now();
     const processedFileName = `processed-${fileName}`;
     context.log(`Processed file name: ${processedFileName}`);
@@ -66,13 +55,12 @@ module.exports = async function (context, req) {
     const uploadTime = Date.now() - uploadStart;
     context.log(`Processed image uploaded in ${uploadTime} ms`);
 
-    // Optionally, upload a status file (for tracking) in JSON format
     const statusStart = Date.now();
     const statusContent = {
       message: "Image processed successfully!",
       processedKey: processedFileName,
       coldStart: coldStart,
-      executionTime: null // can be updated later if needed
+      executionTime: null
     };
     const statusFileName = fileName.replace(/\.(\w+)$/, '-status.json');
     const statusBlobClient = processContainer.getBlockBlobClient(statusFileName);
@@ -102,12 +90,9 @@ module.exports = async function (context, req) {
   } catch (error) {
     context.log.error("Process Error:", error.message);
 
-    // Detect throttle error (HTTP 429) and log a custom telemetry event
+    // Log throttle event if HTTP 429 is detected
     if (error.statusCode === 429 || (error.message && error.message.includes("429"))) {
-      telemetryClient.trackEvent({
-        name: "ThrottleEvent",
-        properties: { FunctionName: "process", ThrottleCount: 1 }
-      });
+      context.log.warn("THROTTLE_EVENT: process, count: 1");
     }
 
     const overallExecTime = Date.now() - overallStart;

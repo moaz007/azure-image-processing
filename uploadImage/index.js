@@ -1,11 +1,4 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
-const appInsights = require("applicationinsights");
-
-// Initialize Application Insights (ensure your APPINSIGHTS_INSTRUMENTATIONKEY is set in your environment)
-if (!appInsights.defaultClient) {
-  appInsights.setup(process.env.APPINSIGHTS_INSTRUMENTATIONKEY).start();
-}
-const telemetryClient = appInsights.defaultClient;
 
 module.exports = async function (context, req) {
   const startTime = Date.now();
@@ -22,12 +15,10 @@ module.exports = async function (context, req) {
       throw new Error("AzureWebJobsStorage connection string is missing.");
     }
 
-    // Create a client for the 'upload' container and upload the image
     const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
     const containerClient = blobServiceClient.getContainerClient('upload');
     const blockBlobClient = containerClient.getBlockBlobClient(fileName);
 
-    // Convert base64 image to buffer and upload with proper content type
     const buffer = Buffer.from(image, "base64");
     await blockBlobClient.uploadData(buffer, { blobHTTPHeaders: { blobContentType: "image/jpeg" } });
     
@@ -41,14 +32,10 @@ module.exports = async function (context, req) {
   } catch (error) {
     context.log.error("Upload Error:", error.message);
 
-    // Detect throttle error (HTTP 429) and log a custom telemetry event
+    // Log a special message if a throttle error (HTTP 429) is detected
     if (error.statusCode === 429 || (error.message && error.message.includes("429"))) {
-      telemetryClient.trackEvent({
-        name: "ThrottleEvent",
-        properties: { FunctionName: "upload", ThrottleCount: 1 }
-      });
+      context.log.warn("THROTTLE_EVENT: upload, count: 1");
     }
-
     context.res = { status: 500, body: { error: error.message } };
   }
 };
