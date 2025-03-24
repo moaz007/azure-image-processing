@@ -8,7 +8,7 @@ if (!appInsights.defaultClient) {
 const telemetryClient = appInsights.defaultClient;
 
 module.exports = async function (context, req) {
-  // --- Track the start of the function ---
+  // Track function start
   telemetryClient.trackEvent({
     name: "FunctionStarted",
     properties: {
@@ -22,6 +22,7 @@ module.exports = async function (context, req) {
   const { image, fileName } = req.body;
 
   if (!image || !fileName) {
+    context.log.error("Missing image or fileName in request body");
     context.res = { status: 400, body: "Missing image or fileName" };
     return;
   }
@@ -31,10 +32,21 @@ module.exports = async function (context, req) {
     if (!connectionString) {
       throw new Error("AzureWebJobsStorage connection string is missing.");
     }
+    context.log("AzureWebJobsStorage connection string is available.");
 
-    // --- Create a client for the 'upload' container and upload the image ---
+    // Create a client for the 'upload' container
     const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
     const containerClient = blobServiceClient.getContainerClient('upload');
+    
+    // Check if container exists; if not, create it.
+    const containerExists = await containerClient.exists();
+    context.log(`Container 'upload' exists: ${containerExists}`);
+    if (!containerExists) {
+      context.log.error("Container 'upload' does not exist. Creating container...");
+      await containerClient.create();
+      context.log("Container 'upload' created successfully.");
+    }
+
     const blockBlobClient = containerClient.getBlockBlobClient(fileName);
 
     // Convert base64 image to buffer and upload with proper content type
@@ -44,7 +56,7 @@ module.exports = async function (context, req) {
     const execTime = Date.now() - startTime;
     context.log(`Upload Execution time: ${execTime}ms`);
 
-    // --- Track the end of the function (success) ---
+    // Track function end (success)
     telemetryClient.trackEvent({
       name: "FunctionEnded",
       properties: {
@@ -61,10 +73,10 @@ module.exports = async function (context, req) {
       body: { message: "Image uploaded successfully!", executionTime: execTime }
     };
   } catch (error) {
-    context.log.error("Upload Error:", error.message);
+    context.log.error("Upload Error:", error);
     const execTime = Date.now() - startTime;
 
-    // --- Track the end of the function (error) ---
+    // Track function end (error)
     telemetryClient.trackEvent({
       name: "FunctionEnded",
       properties: {
