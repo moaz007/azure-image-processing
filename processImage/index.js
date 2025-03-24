@@ -4,18 +4,11 @@ const sharp = require('sharp');
 let isColdStart = true;
 
 module.exports = async function (context, req) {
-  // Optional: simulate throttle if requested
-  if (req.query && req.query.simulateThrottle === "true") {
-    context.log("Simulating throttle response");
-    context.res = { status: 429, body: "Throttled (simulated)" };
-    return;
-  }
-
   const overallStart = Date.now();
   const { containerName, fileName } = req.body;
   if (!containerName || !fileName) {
-    context.log.error("Missing containerName or fileName");
-    context.res = { status: 400, body: "Missing containerName or fileName" };
+    context.log.error("Missing 'containerName' or 'fileName'");
+    context.res = { status: 400, body: "Missing 'containerName' or 'fileName'" };
     return;
   }
 
@@ -55,7 +48,7 @@ module.exports = async function (context, req) {
 
     // Upload the processed image to the 'process' container
     const uploadStart = Date.now();
-    const processedFileName = fileName.replace(/\.(\w+)$/, '-processed.$1');
+    const processedFileName = `processed-${fileName}`;
     context.log(`Processed file name: ${processedFileName}`);
     const processContainer = blobServiceClient.getContainerClient("process");
     const processedBlobClient = processContainer.getBlockBlobClient(processedFileName);
