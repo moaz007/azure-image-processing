@@ -1,11 +1,15 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
-const appInsights = require("applicationinsights"); if (!appInsights.defaultClient) appInsights.start(); const telemetryClient = appInsights.defaultClient;
+const appInsights = require("applicationinsights");
+
+// Initialize Application Insights if not already started.
+if (!appInsights.defaultClient) { appInsights.start(); }
+const telemetryClient = appInsights.defaultClient;
 
 module.exports = async function (context, req) {
-  const startTime = Date.now();
-  // Added telemetry: mark function start
+  // Telemetry: Mark function start
   telemetryClient.trackEvent({ name: "FunctionStarted", properties: { functionName: "upload", invocationId: context.invocationId } });
-  
+
+  const startTime = Date.now();
   const { image, fileName } = req.body;
 
   if (!image || !fileName) {
@@ -35,11 +39,11 @@ module.exports = async function (context, req) {
       status: 200,
       body: { message: "Image uploaded successfully!", executionTime: execTime }
     };
-    // Added telemetry: mark function end (success)
+    // Telemetry: Mark function end (success)
     telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "upload", invocationId: context.invocationId, executionTime: execTime, status: "Success" } });
   } catch (error) {
     context.log.error("Upload Error:", error.message);
-    // Added telemetry: mark function end (error)
+    // Telemetry: Mark function end (error)
     telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "upload", invocationId: context.invocationId, executionTime: Date.now() - startTime, status: "Error", errorMessage: error.message } });
     context.res = { status: 500, body: { error: error.message } };
   }

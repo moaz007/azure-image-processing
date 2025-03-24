@@ -1,14 +1,16 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 const sharp = require('sharp');
-const appInsights = require("applicationinsights"); if (!appInsights.defaultClient) appInsights.start(); const telemetryClient = appInsights.defaultClient;
 
 let isColdStart = true;
 
 module.exports = async function (context, req) {
-  const overallStart = Date.now();
-  // Added telemetry: mark function start
+  // Telemetry: Mark function start
+  const appInsights = require("applicationinsights");
+  if (!appInsights.defaultClient) { appInsights.start(); }
+  const telemetryClient = appInsights.defaultClient;
   telemetryClient.trackEvent({ name: "FunctionStarted", properties: { functionName: "process", invocationId: context.invocationId, coldStart: isColdStart } });
-  
+
+  const overallStart = Date.now();
   const { containerName, fileName } = req.body;
   if (!containerName || !fileName) {
     context.log.error("Missing 'containerName' or 'fileName'");
@@ -95,12 +97,12 @@ module.exports = async function (context, req) {
         executionTime: overallExecTime 
       }
     };
-    // Added telemetry: mark function end (success)
+    // Telemetry: Mark function end (success)
     telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "process", invocationId: context.invocationId, executionTime: overallExecTime, coldStart: coldStart, status: "Success" } });
   } catch (error) {
     context.log.error("Process Error:", error.message);
     const overallExecTime = Date.now() - overallStart;
-    // Added telemetry: mark function end (error)
+    // Telemetry: Mark function end (error)
     telemetryClient.trackEvent({ name: "FunctionEnded", properties: { functionName: "process", invocationId: context.invocationId, executionTime: overallExecTime, coldStart: coldStart, status: "Error", errorMessage: error.message } });
     context.res = { 
       status: 500, 
